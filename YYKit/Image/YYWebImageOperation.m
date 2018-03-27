@@ -459,11 +459,16 @@ static void URLInBlackListAdd(NSURL *url) {
     @autoreleasepool {
         [_lock lock];
         BOOL canceled = [self isCancelled];
+        if (canceled){
+            NSLog(@"recv but cancelled %@" , _fileHandle);
+            [_fileHandle writeData:data];
+            [_fileHandle synchronizeFile];
+            [_fileHandle closeFile];
+            _fileHandle = nil;
+        }
         [_lock unlock];
         
         if (canceled){
-            [_fileHandle synchronizeFile];
-            [_fileHandle closeFile];
             return;
         }
         
@@ -591,6 +596,7 @@ static void URLInBlackListAdd(NSURL *url) {
     @autoreleasepool {
         [_lock lock];
         [_fileHandle closeFile];
+        _fileHandle = nil;
         [[NSFileManager defaultManager] removeItemAtPath:self.request.URL.tempDownloadPath error:nil];
         _connection = nil;
         if (![self isCancelled]) {
@@ -662,6 +668,7 @@ static void URLInBlackListAdd(NSURL *url) {
         [_lock lock];
         [_fileHandle synchronizeFile];
         [_fileHandle closeFile];
+        _fileHandle = nil;
         if (![self isCancelled]) {
             if (_completion) {
                 _completion(nil, _request.URL, YYWebImageFromNone, YYWebImageStageFinished, error);
