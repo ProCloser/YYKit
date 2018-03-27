@@ -13,6 +13,7 @@
 #import "YYImageCache.h"
 #import "YYWebImageOperation.h"
 #import "YYImageCoder.h"
+#import "Categories/NSURL+tempPath.h"
 
 @implementation YYWebImageManager
 
@@ -60,6 +61,11 @@
     request.HTTPShouldHandleCookies = (options & YYWebImageOptionHandleCookies) != 0;
     request.allHTTPHeaderFields = [self headersForURL:url];
     request.HTTPShouldUsePipelining = YES;
+    NSFileHandle *fhandle = [NSFileHandle fileHandleForReadingAtPath:url.tempDownloadPath];
+    [fhandle seekToEndOfFile];
+    NSString *range = [NSString stringWithFormat:@"bytes=%lld-", fhandle.offsetInFile];
+    [request addValue:range forHTTPHeaderField:@"Range"];
+    [fhandle closeFile];
     request.cachePolicy = (options & YYWebImageOptionUseNSURLCache) ?
         NSURLRequestUseProtocolCachePolicy : NSURLRequestReloadIgnoringLocalCacheData;
     

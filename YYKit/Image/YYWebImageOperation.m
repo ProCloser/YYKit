@@ -16,6 +16,7 @@
 #import "UIImage+YYAdd.h"
 #import <ImageIO/ImageIO.h>
 #import "YYKitMacro.h"
+#import "Categories/NSURL+tempPath.h"
 
 #if __has_include("YYDispatchQueuePool.h")
 #import "YYDispatchQueuePool.h"
@@ -90,6 +91,7 @@ static void URLInBlackListAdd(NSURL *url) {
 @property (readwrite, getter=isStarted) BOOL started;
 @property (nonatomic, strong) NSRecursiveLock *lock;
 @property (nonatomic, strong) NSURLConnection *connection;
+@property (nonatomic, strong) NSFileHandle *fileHandle;
 @property (nonatomic, strong) NSMutableData *data;
 @property (nonatomic, assign) NSInteger expectedSize;
 @property (nonatomic, assign) UIBackgroundTaskIdentifier taskID;
@@ -434,11 +436,19 @@ static void URLInBlackListAdd(NSURL *url) {
             if (response.expectedContentLength) {
                 _expectedSize = (NSInteger)response.expectedContentLength;
                 if (_expectedSize < 0) _expectedSize = -1;
+                
+                NSString *tempPath = [self.request.URL tempDownloadPath];
+                _fileHandle = [NSFileHandle fileHandleForWritingAtPath:tempPath];
+                [_fileHandle seekToEndOfFile];
+                _data = [NSMutableData dataWithContentsOfFile:tempPath];
             }
-            _data = [NSMutableData dataWithCapacity:_expectedSize > 0 ? _expectedSize : 0];
+            if (!_data) {
+                _data = [NSMutableData dataWithCapacity:_expectedSize > 0 ? _expectedSize : 0];
+            }
+            
             if (_progress) {
                 [_lock lock];
-                if (![self isCancelled]) _progress(0, _expectedSize);
+                if (![self isCancelled]) _progress(_data.length, _expectedSize);
                 [_lock unlock];
             }
         }
@@ -450,8 +460,14 @@ static void URLInBlackListAdd(NSURL *url) {
         [_lock lock];
         BOOL canceled = [self isCancelled];
         [_lock unlock];
-        if (canceled) return;
         
+        if (canceled){
+            [_fileHandle synchronizeFile];
+            [_fileHandle closeFile];
+            return;
+        }
+        
+        [_fileHandle writeData:data];
         if (data) [_data appendData:data];
         if (_progress) {
             [_lock lock];
@@ -574,6 +590,8 @@ static void URLInBlackListAdd(NSURL *url) {
 - (void)connectionDidFinishLoading:(NSURLConnection *)connection {
     @autoreleasepool {
         [_lock lock];
+        [_fileHandle closeFile];
+        [[NSFileManager defaultManager] removeItemAtPath:self.request.URL.tempDownloadPath error:nil];
         _connection = nil;
         if (![self isCancelled]) {
             __weak typeof(self) _self = self;
@@ -642,6 +660,8 @@ static void URLInBlackListAdd(NSURL *url) {
 - (void)connection:(NSURLConnection *)connection didFailWithError:(NSError *)error {
     @autoreleasepool {
         [_lock lock];
+        [_fileHandle synchronizeFile];
+        [_fileHandle closeFile];
         if (![self isCancelled]) {
             if (_completion) {
                 _completion(nil, _request.URL, YYWebImageFromNone, YYWebImageStageFinished, error);
