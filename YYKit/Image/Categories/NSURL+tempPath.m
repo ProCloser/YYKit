@@ -10,6 +10,12 @@
 
 @implementation NSURL (tempPath)
 
+-(BOOL)isLocalThumbImage{
+    if ([self.query.lowercaseString containsString:@"s="]) {
+        return YES;
+    }
+    return NO;
+}
 
 -(NSString *)tempDownloadPath{
     

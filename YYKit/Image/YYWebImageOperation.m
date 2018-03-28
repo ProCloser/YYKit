@@ -437,11 +437,15 @@ static void URLInBlackListAdd(NSURL *url) {
                 _expectedSize = (NSInteger)response.expectedContentLength;
                 if (_expectedSize < 0) _expectedSize = -1;
                 
-                NSString *tempPath = [self.request.URL tempDownloadPath];
-                _fileHandle = [NSFileHandle fileHandleForWritingAtPath:tempPath];
-                [_fileHandle seekToEndOfFile];
-                _data = [NSMutableData dataWithContentsOfFile:tempPath];
+                if (!self.request.URL.isLocalThumbImage) {
+                    NSString *tempPath = [self.request.URL tempDownloadPath];
+                    _fileHandle = [NSFileHandle fileHandleForWritingAtPath:tempPath];
+                    [_fileHandle seekToEndOfFile];
+                    _data = [NSMutableData dataWithContentsOfFile:tempPath];
+                    
+                }
             }
+            
             if (!_data) {
                 _data = [NSMutableData dataWithCapacity:_expectedSize > 0 ? _expectedSize : 0];
             }
@@ -669,6 +673,8 @@ static void URLInBlackListAdd(NSURL *url) {
         [_fileHandle synchronizeFile];
         [_fileHandle closeFile];
         _fileHandle = nil;
+        [[NSFileManager defaultManager] removeItemAtPath:self.request.URL.tempDownloadPath error:nil];
+
         if (![self isCancelled]) {
             if (_completion) {
                 _completion(nil, _request.URL, YYWebImageFromNone, YYWebImageStageFinished, error);

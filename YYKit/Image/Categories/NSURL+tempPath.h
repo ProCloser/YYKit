@@ -9,6 +9,8 @@
 
 @interface NSURL (tempPath)
 
+-(BOOL)isLocalThumbImage;
+
 -(NSString *)tempDownloadPath;
 
 @end
