@@ -441,6 +441,9 @@ static void URLInBlackListAdd(NSURL *url) {
                     NSString *tempPath = [self.request.URL tempDownloadPath];
                     _fileHandle = [NSFileHandle fileHandleForWritingAtPath:tempPath];
                     [_fileHandle seekToEndOfFile];
+                    if (_expectedSize != -1) {
+                        _expectedSize += _fileHandle.offsetInFile;
+                    }
                     _data = [NSMutableData dataWithContentsOfFile:tempPath];
                     
                 }
@@ -465,7 +468,7 @@ static void URLInBlackListAdd(NSURL *url) {
         BOOL canceled = [self isCancelled];
         if (canceled){
             NSLog(@"recv but cancelled %@" , _fileHandle);
-            [_fileHandle writeData:data];
+//            [_fileHandle writeData:data];
             [_fileHandle synchronizeFile];
             [_fileHandle closeFile];
             _fileHandle = nil;
@@ -670,10 +673,12 @@ static void URLInBlackListAdd(NSURL *url) {
 - (void)connection:(NSURLConnection *)connection didFailWithError:(NSError *)error {
     @autoreleasepool {
         [_lock lock];
-        [_fileHandle synchronizeFile];
-        [_fileHandle closeFile];
-        _fileHandle = nil;
-        [[NSFileManager defaultManager] removeItemAtPath:self.request.URL.tempDownloadPath error:nil];
+        if (_fileHandle) {
+            [_fileHandle synchronizeFile];
+            [_fileHandle closeFile];
+            _fileHandle = nil;
+            [[NSFileManager defaultManager] removeItemAtPath:self.request.URL.tempDownloadPath error:nil];
+        }
 
         if (![self isCancelled]) {
             if (_completion) {
